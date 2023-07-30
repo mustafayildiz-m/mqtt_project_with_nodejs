@@ -1,6 +1,7 @@
 const mqtt = require("mqtt");
 const pgService = require("../service/pgService");
 exports.publishMQTTMessage = async function (req, res) {
+
     try {
         const client = await mqtt.connect(process.env.MQTT_HOST_NAME, {
             clean: true,
@@ -34,81 +35,166 @@ exports.publishMQTTMessage = async function (req, res) {
                         }), {qos: 2});
                         break;
                     case "wifi":
-                        let msgWifi
-                        if (message.ip_set) {
-                            msgWifi = {
-                                ssid: "burada wifi name",
-                                pass: 'string',
-                                ip_set: true,// true ise statik , false ise dinamk olacak
-                                ip: 'string',
-                                submask: 'string',
-                                gateway: 'string',
-                                dns: 'string data '
+                        try {
+                            await client.subscribe(`superlog/${topic}`);
+                            let msgWifi
+                            if (req.body.wifi.ip_set) {
+                                msgWifi = {
+                                    ssid: req.body.wifi.ssid,
+                                    password: req.body.wifi.password,
+                                    ip_set: true,// true ise statik , false ise dinamk olacak
+                                    ip: req.body.wifi.ip,
+                                    submask: req.body.wifi.submask,
+                                    gateway: req.body.wifi.gateway,
+                                    dns: req.body.wifi.dns
+                                }
+                            } else {
+                                msgWifi = {
+                                    ssid: req.body.wifi.ssid,
+                                    password: req.body.wifi.password,
+                                    ip_set: false,// true ise statik , false ise dinamk olacak
+                                }
                             }
-                        } else {
-                            msgWifi = {
-                                ssid: "burada wifi name",
-                                pass: 'string',
-                                ip_set: false,// true ise statik , false ise dinamk olacak
-                            }
-                        }
-                        await client.publish(
-                            topic_device,
-                            JSON.stringify(msgWifi),
-                            {qos: 2}
-                        );
-                        break;
-                    case "ethernet":
-                        let msgEthernet
-                        if (message.ip_set) {
-                            msgEthernet = {
-                                ip_set: true,// true ise statik , false ise dinamk olacak
-                                ip: 'string',
-                                submask: 'string',
-                                gateway: 'string',
-                                dns: 'string data '
-                            }
-                        } else {
-                            msgEthernet = {
-                                ip_set: false,// true ise statik , false ise dinamk olacak
-                            }
+                            await client.publish(
+                                topic_device,
+                                JSON.stringify(msgWifi),
+                                {qos: 2}, async (err) => {
+                                    if (err) console.error(err)
+                                }
+                            );
+
+                            // Handle incoming messages
+                            client.on('message', async (receivedTopic, message) => {
+                                let parsedObj = JSON.parse(message.toString());
+                                console.log(parsedObj);
+
+                                if (parsedObj.statu === 'ok') {
+                                    await client.publish(`superlog/reset/${topic}`, JSON.stringify({"statu": "reset"}), {qos: 2});
+
+                                    res.status(200).send({message: 'success'})
+                                    res.end();
+                                    await client.unsubscribe(`superlog/${topic}`, (error) => {
+                                        if (error) {
+                                            console.error('wifi bilgileri eklenemedi:', error);
+                                        } else {
+                                            console.log('wifi bilgileri eklendi:', topic);
+                                        }
+                                    });
+                                } else {
+                                    res.status(200).send({message: 'error'})
+                                    res.end();
+                                }
+
+                            });
+                        } catch (e) {
+                            return res.status(400).json({status: 400, message: e.message});
+
                         }
 
-                        await client.publish(
-                            topic_device,
-                            JSON.stringify(msgEthernet),
-                            {qos: 2}
-                        );
+                        break;
+                    case "ethernet":
+                        try {
+                            await client.subscribe(`superlog/${topic}`);
+                            let msgEthernet
+                            if (req.body.ethernet.ip_set) {
+                                msgEthernet = {
+                                    ip_set: true,// true ise statik , false ise dinamk olacak
+                                    ip: req.body.ethernet.ip,
+                                    submask: req.body.ethernet.ip,
+                                    gateway: req.body.ethernet.gateway,
+                                    dns: req.body.ethernet.dns
+                                }
+                            } else {
+                                msgEthernet = {
+                                    ip_set: false,// true ise statik , false ise dinamk olacak
+                                }
+                            }
+                            await client.publish(
+                                topic_device,
+                                JSON.stringify(msgEthernet),
+                                {qos: 2}, async (err) => {
+                                    if (err) console.error(err)
+                                }
+                            );
+
+                            // Handle incoming messages
+                            client.on('message', async (receivedTopic, message) => {
+                                let parsedObj = JSON.parse(message.toString());
+                                console.log(parsedObj);
+
+                                if (parsedObj.statu === 'ok') {
+                                    await client.publish(`superlog/reset/${topic}`);
+                                    res.status(200).send({message: 'success'})
+                                    res.end();
+                                    await client.unsubscribe(`superlog/${topic}`, (error) => {
+                                        if (error) {
+                                            console.error('ethernet bilgileri eklenemedi:', error);
+                                        } else {
+                                            console.log('ethernet bilgileri eklendi:', topic);
+                                        }
+                                    });
+                                } else {
+                                    res.status(200).send({message: 'error'})
+                                    res.end();
+                                }
+
+                            });
+                        } catch (e) {
+                            return res.status(400).json({status: 400, message: e.message});
+
+                        }
                         break;
                     case "trashold":
                         try {
+                            await client.subscribe(`superlog/${topic}`);
+
+                            let {
+                                temp_min,
+                                moisture_min,
+                                temp_max,
+                                moisture_max,
+                                crit_temp_min,
+                                crit_moisture_min,
+                                crit_temp_max,
+                                crit_moisture_max,
+                            } = req.body.trashold
+                            let ftemp_min = parseFloat(temp_min);
+                            let fmoisture_min = parseFloat(moisture_min)
+                            let ftemp_max = parseFloat(temp_max);
+                            let fmoisture_max = parseFloat(moisture_max);
+                            let fcrit_temp_min = parseFloat(crit_temp_min);
+                            let fcrit_moisture_min = parseFloat(crit_moisture_min);
+                            let fcrit_temp_max = parseFloat(crit_temp_max);
+                            let fcrit_moisture_max = parseFloat(crit_moisture_max);
+                            let sendData = JSON.stringify({
+                                temp_min: ftemp_min,
+                                moisture_min: fmoisture_min,
+                                temp_max: ftemp_max,
+                                moisture_max: fmoisture_max,
+                                crit_temp_min: fcrit_temp_min,
+                                crit_moisture_min: fcrit_moisture_min,
+                                crit_temp_max: fcrit_temp_max,
+                                crit_moisture_max: fcrit_moisture_max
+                            })
+
                             await client.publish(
                                 topic_device,
-                                JSON.stringify(req.body.trashold),
+                                sendData,
                                 {qos: 2}, async (err) => {
                                     if (err) console.error(err)
-                                    let {
-                                        temp_min,
-                                        moisture_min,
-                                        temp_max,
-                                        moisture_max,
-                                        crit_temp_min,
-                                        crit_moisture_min,
-                                        crit_temp_max,
-                                        crit_moisture_max
-                                    } = req.body.trashold
+
 
                                     const query = {
                                         text: 'INSERT INTO device_temp_hum_limits (temp_min,moisture_min,temp_max, moisture_max,crit_temp_min,crit_moisture_min, crit_temp_max, crit_moisture_max,serial_no) VALUES ($1, $2, $3,$4,$5,$6,$7,$8,$9)',
                                         values: [
-                                            parseInt(temp_min),
-                                            parseInt(moisture_min),
-                                            parseInt(temp_max),
-                                            parseInt(moisture_max),
-                                            parseInt(crit_temp_min),
-                                            parseInt(crit_moisture_min),
-                                            parseInt(crit_temp_max),
-                                            parseInt(crit_moisture_max),
+                                            ftemp_min,
+                                            fmoisture_min,
+                                            ftemp_max,
+                                            fmoisture_max,
+                                            fcrit_temp_min,
+                                            fcrit_moisture_min,
+                                            fcrit_temp_max,
+                                            fcrit_moisture_max,
                                             req.body.topic
                                         ],
                                     };
@@ -123,8 +209,29 @@ exports.publishMQTTMessage = async function (req, res) {
 
                                 }
                             );
-                            res.status(200).send({message: 'success'})
-                            res.end()
+                            // Handle incoming messages
+                            client.on('message', async (receivedTopic, message) => {
+                                let parsedObj = JSON.parse(message.toString());
+                                console.log(parsedObj);
+
+                                if (parsedObj.statu === 'ok') {
+                                    res.status(200).send({message: 'success'})
+                                    res.end();
+                                    await client.unsubscribe(`superlog/${topic}`, (error) => {
+                                        if (error) {
+                                            console.error('Abonelikten çıkış başarısız:', error);
+                                        } else {
+                                            console.log('Abonelikten çıkıldı:', topic);
+                                        }
+                                    });
+                                } else {
+                                    res.status(200).send({message: 'error'})
+                                    res.end();
+                                }
+
+                            });
+
+
                         } catch (e) {
                             return res.status(400).json({status: 400, message: e.message});
 
