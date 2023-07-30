@@ -9,11 +9,19 @@ npm install
 ```
 Use the package manager [npm](https://nodejs.org/en/download) to install Superlog packages.
 
+```bash
+npm run forever
+```
+Run the project with forever
+```bash
+npm forever stop 0
+```
+Stop forever
 
 ```bash
 npm run dev
 ```
-Run the project
+Run the project with nodemon
 
 
 ## Usage
