@@ -20,7 +20,8 @@ exports.publishMQTTMessage = async function (req, res) {
 
         let {topic, message, statu} = req.body
         await client.on("connect", async () => {
-                let topic_device = `superlog/${statu}/${topic}`
+                let topic_device = `superlog/${statu}/${topic}`;
+                console.log(statu)
                 switch (statu) {
                     case "info":
                         await client.publish(topic_device, JSON.stringify({'status': 'info'}), {qos: 2});
@@ -55,6 +56,7 @@ exports.publishMQTTMessage = async function (req, res) {
                                     ip_set: false,// true ise statik , false ise dinamk olacak
                                 }
                             }
+                            console.log(msgWifi)
                             await client.publish(
                                 topic_device,
                                 JSON.stringify(msgWifi),
@@ -69,6 +71,7 @@ exports.publishMQTTMessage = async function (req, res) {
                                 console.log(parsedObj);
 
                                 if (parsedObj.statu === 'ok') {
+                                    console.log("içerde")
                                     await client.publish(`superlog/reset/${topic}`, JSON.stringify({"statu": "reset"}), {qos: 2});
 
                                     res.status(200).send({message: 'success'})
@@ -87,6 +90,7 @@ exports.publishMQTTMessage = async function (req, res) {
 
                             });
                         } catch (e) {
+                            console.log(e.message)
                             return res.status(400).json({status: 400, message: e.message});
 
                         }
@@ -123,7 +127,7 @@ exports.publishMQTTMessage = async function (req, res) {
                                 console.log(parsedObj);
 
                                 if (parsedObj.statu === 'ok') {
-                                    await client.publish(`superlog/reset/${topic}`);
+                                    // await client.publish(`superlog/reset/${topic}`);
                                     res.status(200).send({message: 'success'})
                                     res.end();
                                     await client.unsubscribe(`superlog/${topic}`, (error) => {
@@ -148,64 +152,37 @@ exports.publishMQTTMessage = async function (req, res) {
                         try {
                             await client.subscribe(`superlog/${topic}`);
 
-                            let {
-                                temp_min,
-                                moisture_min,
-                                temp_max,
-                                moisture_max,
-                                crit_temp_min,
-                                crit_moisture_min,
-                                crit_temp_max,
-                                crit_moisture_max,
-                            } = req.body.trashold
-                            let ftemp_min = parseFloat(temp_min);
-                            let fmoisture_min = parseFloat(moisture_min)
-                            let ftemp_max = parseFloat(temp_max);
-                            let fmoisture_max = parseFloat(moisture_max);
-                            let fcrit_temp_min = parseFloat(crit_temp_min);
-                            let fcrit_moisture_min = parseFloat(crit_moisture_min);
-                            let fcrit_temp_max = parseFloat(crit_temp_max);
-                            let fcrit_moisture_max = parseFloat(crit_moisture_max);
-                            let sendData = JSON.stringify({
-                                temp_min: ftemp_min,
-                                moisture_min: fmoisture_min,
-                                temp_max: ftemp_max,
-                                moisture_max: fmoisture_max,
-                                crit_temp_min: fcrit_temp_min,
-                                crit_moisture_min: fcrit_moisture_min,
-                                crit_temp_max: fcrit_temp_max,
-                                crit_moisture_max: fcrit_moisture_max
-                            })
-
                             await client.publish(
                                 topic_device,
-                                sendData,
+                                JSON.stringify({
+                                    temp_min: parseFloat(req.body.trashold.temp_min),
+                                    moisture_min: parseFloat(req.body.trashold.moisture_min),
+                                    temp_max: parseFloat(req.body.trashold.temp_max),
+                                    moisture_max: parseFloat(req.body.trashold.moisture_max),
+                                    crit_temp_min: parseFloat(req.body.trashold.crit_temp_min),
+                                    crit_moisture_min: parseFloat(req.body.trashold.crit_moisture_min),
+                                    crit_temp_max: parseFloat(req.body.trashold.crit_temp_max),
+                                    crit_moisture_max: parseFloat(req.body.trashold.crit_moisture_max)
+                                }),
                                 {qos: 2}, async (err) => {
                                     if (err) console.error(err)
-
 
                                     const query = {
                                         text: 'INSERT INTO device_temp_hum_limits (temp_min,moisture_min,temp_max, moisture_max,crit_temp_min,crit_moisture_min, crit_temp_max, crit_moisture_max,serial_no) VALUES ($1, $2, $3,$4,$5,$6,$7,$8,$9)',
                                         values: [
-                                            ftemp_min,
-                                            fmoisture_min,
-                                            ftemp_max,
-                                            fmoisture_max,
-                                            fcrit_temp_min,
-                                            fcrit_moisture_min,
-                                            fcrit_temp_max,
-                                            fcrit_moisture_max,
+                                            parseFloat(req.body.trashold.temp_min),
+                                            parseFloat(req.body.trashold.moisture_min),
+                                            parseFloat(req.body.trashold.temp_max),
+                                            parseFloat(req.body.trashold.moisture_max),
+                                            parseFloat(req.body.trashold.crit_temp_min),
+                                            parseFloat(req.body.trashold.crit_moisture_min),
+                                            parseFloat(req.body.trashold.crit_temp_max),
+                                            parseFloat(req.body.trashold.crit_moisture_max),
                                             req.body.topic
                                         ],
                                     };
-                                    try {
-                                        const result = await pgClient.client.query(query);
-                                        console.log('Yeni kayıt eklendi:', result.rowCount, 'satır etkilendi.');
-
-                                    } catch (e) {
-                                        console.error('Sorgu hatası:', err);
-                                        throw err;
-                                    }
+                                    const result = await pgClient.client.query(query);
+                                    console.log('Yeni kayıt eklendi:', result.rowCount, 'satır etkilendi.');
 
                                 }
                             );
@@ -215,6 +192,7 @@ exports.publishMQTTMessage = async function (req, res) {
                                 console.log(parsedObj);
 
                                 if (parsedObj.statu === 'ok') {
+                                    //await client.publish(`superlog/reset/${topic}`, JSON.stringify({"statu": "reset"}), {qos: 2});
                                     res.status(200).send({message: 'success'})
                                     res.end();
                                     await client.unsubscribe(`superlog/${topic}`, (error) => {
@@ -243,13 +221,13 @@ exports.publishMQTTMessage = async function (req, res) {
                             topic_device,
                             JSON.stringify({
                                 server: "server name",
-                                user_name: "name",
-                                password: "string",
+                                login_email: "name",
+                                login_password: "string",
                                 port: 3000, // number
                                 sender_mail: "string",
                                 to_mail: "string",
-                                mail_subject: "string",
-                                mail_body: "string"
+                                mail_header: "string",
+                                mail_subject: "string"
                             }),
                             {qos: 2}
                         );
@@ -262,8 +240,8 @@ exports.publishMQTTMessage = async function (req, res) {
                     case "cycle":
                         await client.publish(topic_device, JSON.stringify({
                             cycle: 3,  // herşey yolundaysa data bana kaç dk da bir gelecek dakika cinsinden gelecek
-                            offline_cycle: 3,// veri kaç dk da göndersin
-                            alert_cycle: 3 // veri kaç dk da göndersin
+                            offline_cycle: 5,// veri kaç dk da göndersin (min 5 dk olacak) 5 değerinin altı olmamalı.
+                            alert_cycle: 3 // sıcaklık derecesi alarm durmuna geçtiğinde kaç sn de bir veri göndersin
                         }), {qos: 2});
                         break;
                     case "ntp":
