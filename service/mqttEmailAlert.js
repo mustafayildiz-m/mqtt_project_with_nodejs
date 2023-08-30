@@ -1,11 +1,11 @@
 const nodemailer = require("nodemailer");
 const emailConfig = {
-    host: 'proxy.uzmanposta.com',
+    host: '',
     port: 587,
     secure: false,
     auth: {
-        user: 'info@arsiwi.com',
-        pass: 'Aa.159357*',
+        user: '',
+        pass: '',
     },
 };
 const transporter = nodemailer.createTransport(emailConfig);
@@ -43,7 +43,7 @@ function sendEmail(object, serial_no, allowed_email, deviceLimits, zone) {
       <p>Sıcaklık: ${object.temp} °C</p>
       <p>Nem: ${object.humd} %</p>
       <p>Durum: 
-        <span class="alert">${object.state == 'alarm' ? 'Alarm' : 'Kritik Alarm'}</span>
+        <span class="alert">${object.state == process.env.ALARM ? 'Alarm' : 'Kritik Alarm'}</span>
       </p>
       <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen cevaplamayın.</p>
     </body>

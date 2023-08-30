@@ -2,9 +2,9 @@ const axios = require('axios');
 require('dotenv').config()
 
 const sendData2LaravelApi = async (postData) => {
-    console.log("içerde")
     try {
-        const apiUrl = `${process.env.RESTFUL_LARAVEL_URL}api/send-email`; // endpoint
+        const apiUrl = `${process.env.RESTFUL_LARAVEL_URL}/api/send-email`; // endpoint
+        console.log(apiUrl);
         const bufferData = Buffer.from(postData.serial_no, 'utf-8');
         const base64Encoded = bufferData.toString('base64');
         const config = {

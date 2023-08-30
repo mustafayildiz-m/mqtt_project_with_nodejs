@@ -20,7 +20,8 @@ let mqttClient = mqtt.connect(process.env.MQTT_HOST_NAME, {
     password: process.env.MQTT_PASSWORD,
     reconnectPeriod: 1000,
 })
-let pgClient = new pgService()
+let pgClient = new pgService();
+
 mqttClient.on("error", (err) => {
     if (err) console.error(err)
     mqttClient.end();
@@ -166,10 +167,11 @@ mqttClient.on("connect", async () => {
                             try {
                                 //** mail sending process start *//
                                 let {state} = parsedObj;
+                                console.log(state, "state")
+
                                 const currentTime = Date.now();
                                 const deviceData = devices[serial_no];
-                                if (state === 'alarm' || state === 'critical_alarm') { // gelen durum alarm yada critik alarmsa mail uyarı gönder
-                                    console.log(state)
+                                if (state === parseInt(process.env.ALARM) || state === parseInt(process.env.CRITICAL_ALARM)) { // gelen durum alarm yada critik alarmsa mail uyarı gönder
                                     if (
                                         currentTime - deviceData.lastEmailTimestamp >= emailInterval ||
                                         (state !== deviceData.lastStatus &&
@@ -182,7 +184,7 @@ mqttClient.on("connect", async () => {
                                         if (result.rows.length > 0) { //eğer cihaza kayıtlı email varsa
                                             allowed_email = result.rows[0].allowed_email;
                                             allowed_workspace_id = result.rows[0].allowed_workspace_id;
-                                            console.log('device mail ->:', allowed_email);
+                                            console.log('owner e-mail ->:', allowed_email);
                                             //get logs
                                             let deviceLimits = await getLimits(serial_no);
                                             // let deviceLimits = "1"
@@ -203,7 +205,7 @@ mqttClient.on("connect", async () => {
 
                                         deviceData.lastEmailTimestamp = currentTime;
                                     }
-                                } else if (state === 'normal') {
+                                } else if (state === process.env.NORMAL) {
                                     devices[serial_no] = {
                                         lastStatus: '', // Son durum bilgisi
                                         lastEmailTimestamp: 0, // Son e-posta gönderim zamanı
@@ -310,7 +312,7 @@ mqttClient.on("connect", async () => {
 });
 
 const getLimits = async (serial_no) => {
-    const logResult = await pgClient.client.query('SELECT limit_id FROM device_logs WHERE serial_no = $1 AND state IN ($2, $3) ORDER BY id DESC LIMIT 1;', [serial_no, 'critical_alarm', 'alarm']);
+    const logResult = await pgClient.client.query('SELECT limit_id FROM device_logs WHERE serial_no = $1 AND state IN ($2, $3) ORDER BY id DESC LIMIT 1;', [serial_no, parseInt(process.env.CRITICAL_ALARM), parseInt(process.env.ALARM)]);
     if (logResult.rows.length > 0) {
         const limitId = logResult.rows[0].limit_id;
         // device_temp_hum_limits tablosundaki id ile eşleştirip device_temp_hum_limits tablosundaki değerleri alıyoruz
@@ -352,7 +354,14 @@ const getZone = async (serial_no) => {
 async function getLastRecordId(serial_no) {
     try {
         const result = await pgClient.client.query('SELECT id FROM device_temp_hum_limits WHERE serial_no = $1 ORDER BY id DESC LIMIT 1', [serial_no]);
-        return result.rows[0].id; // ID'yi döndürür
+        if (result.rowCount === 0) {
+            const queryText = 'INSERT INTO device_temp_hum_limits(serial_no) VALUES($1) RETURNING id';
+            await pgClient.client.query(queryText, [serial_no]).then((res) => {
+                return res.rows[0].id;
+            })
+        } else {
+            return result.rows[0].id; // ID'yi döndürür
+        }
     } catch (err) {
         console.error('Sorgu hatası:', err);
         throw err;
@@ -395,5 +404,5 @@ let getHourAndSerialNo = (date, serial_no) => {
     return hour.slice(0, -3) + '-' + String(serial_no)
 }
 app.listen(process.env.RESTFUL_PORT, process.env.RESTFUL_HOST, () => {
-    console.log(`mqtt app listening on port ${process.env.RESTFUL_PORT}:${process.env.RESTFUL_PORT}`);
+    console.log(`mqtt app listening on port ${process.env.RESTFUL_HOST}:${process.env.RESTFUL_PORT}`);
 });
